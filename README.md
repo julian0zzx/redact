@@ -1,28 +1,15 @@
-<div align="center">
+# Censgate Redact
 
-<img src="assets/censgate-redact-logo-v1.png" alt="Censgate Redact" width="400">
-
-[![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Tests](https://github.com/censgate/redact/workflows/CI/badge.svg)](https://github.com/censgate/redact/actions)
-[![Crates.io](https://img.shields.io/crates/v/redact-core.svg)](https://crates.io/crates/redact-core)
-
-**High-performance PII detection and anonymization engine**
+High-performance PII detection and anonymization engine
 
 A production-ready, Rust-based solution designed as a drop-in replacement for Microsoft Presidio.
 
 [Quick Start](#quick-start) · [Documentation](#documentation) · [Examples](#examples) · [Contributing](#contributing)
 
-</div>
-
----
-
-## Features
-
 - **High Performance** — 10-100x faster than Python-based solutions with sub-millisecond inference
 - **Memory Safe** — Rust's borrow checker eliminates entire classes of security vulnerabilities
 - **Production Ready** — 36 pattern-based entity types with validation, plus transformer-based NER
-- **Multi-Platform** — Native server, WebAssembly (WASM), and CLI support
+- **Multi-Platform** — Native server and CLI support
 - **ML-Powered** — Full ONNX Runtime integration for transformer models (BERT, RoBERTa, DistilBERT)
 - **Lightweight** — ~20-50MB memory footprint vs ~300MB for Presidio
 - **Extensible** — Plugin architecture for custom recognizers and anonymization strategies
@@ -308,7 +295,7 @@ curl -X POST http://localhost:8080/api/v1/anonymize \
 ### Pattern-Based (36 types)
 
 | Category | Entity Types |
-|----------|-------------|
+|----------|--------------|
 | **Contact** | `EMAIL_ADDRESS`, `PHONE_NUMBER`, `IP_ADDRESS`, `URL`, `DOMAIN_NAME` |
 | **Financial** | `CREDIT_CARD`, `IBAN_CODE`, `US_BANK_NUMBER` |
 | **US** | `US_SSN`, `US_DRIVER_LICENSE`, `US_PASSPORT`, `US_ZIP_CODE` |
@@ -393,9 +380,9 @@ The export script creates a directory with the following files:
 
 ```
 models/bert-base-ner/
-├── model.onnx          # ONNX model file (REQUIRED)
-├── tokenizer.json      # HuggingFace tokenizer (REQUIRED)
-├── config.json         # Model config with label mappings
+├── model.onnx           # ONNX model file (REQUIRED)
+├── tokenizer.json       # HuggingFace tokenizer (REQUIRED)
+├── config.json          # Model config with label mappings
 ├── special_tokens_map.json
 └── tokenizer_config.json
 ```
@@ -446,22 +433,22 @@ Test payload: `Contact john.doe@example.com or call (555) 123-4567. SSN: 123-45-
 cargo bench --package redact-core
 ```
 
-See [docs/benchmarks/](docs/benchmarks/) for methodology and detailed results.
+See [docs/benchmarks/](/censgate/redact/blob/main/docs/benchmarks) for methodology and detailed results.
 
 ## Project Structure
 
 ```
 redact/
 ├── crates/
-│   ├── redact-core/     # Core detection & anonymization engine
-│   ├── redact-ner/      # ONNX NER integration
-│   ├── redact-api/      # REST API service (Axum)
-│   ├── redact-cli/      # Command-line tool
-│   └── redact-wasm/     # WebAssembly bindings
-├── patterns/            # PII detection patterns (GDPR, HIPAA, CCPA)
-├── scripts/             # Utility scripts (model export)
-├── examples/            # Usage examples
-└── docs/                # Documentation
+│   ├── redact-core/      # Core detection & anonymization engine
+│   ├── redact-ner/       # ONNX NER integration
+│   ├── redact-api/       # REST API service (Axum)
+│   ├── redact-cli/       # Command-line tool
+│   └── redact-wasm/      # WebAssembly bindings
+├── patterns/             # PII detection patterns (GDPR, HIPAA, CCPA)
+├── scripts/              # Utility scripts (model export)
+├── examples/             # Usage examples
+└── docs/                 # Documentation
 ```
 
 ## Testing
@@ -485,18 +472,20 @@ cargo test --package redact-core --test error_scenarios
 cargo test --package redact-core --test concurrent_operations
 ```
 
-See [TEST_COVERAGE.md](TEST_COVERAGE.md) for detailed coverage report.
+See [TEST_COVERAGE.md](/censgate/redact/blob/main/TEST_COVERAGE.md) for detailed coverage report.
 
 ## Documentation
 
 - [API Documentation](https://docs.rs/redact-core) — Rust API docs
-- [Test Coverage](TEST_COVERAGE.md) — Testing details
-- [Contributing Guide](CONTRIBUTING.md) — How to contribute
-- [Examples](examples/) — Code examples
+- [Test Coverage](/censgate/redact/blob/main/TEST_COVERAGE.md) — Testing details
+- [Contributing Guide](/censgate/redact/blob/main/CONTRIBUTING.md) — How to contribute
+- [Examples](/censgate/redact/blob/main/examples) — Code examples
 
 ## Roadmap
 
-### v0.6.0 (Current)
+### Pre-1.0.0
+
+#### v0.6.0 (Current)
 
 - [x] Complete Rust rewrite (replacing Go v0.1.0-v0.4.1)
 - [x] 36 pattern-based entity types with checksum validation
@@ -509,26 +498,20 @@ See [TEST_COVERAGE.md](TEST_COVERAGE.md) for detailed coverage report.
 - [x] Comprehensive test suite (~75% coverage)
 - [x] Entity overlap resolution with specificity scoring
 
-### v0.7.0 (Planned)
+#### v0.9.0 (Planned)
 
+- [x] Publish crates to crates.io
 - [ ] WebAssembly (WASM) browser support
-- [ ] Publish crates to crates.io
-- [ ] Enhanced documentation
 - [ ] Streaming API for large texts
-
-### v0.8.0 (Future)
-
-- [ ] Mobile FFI bindings (Swift/Kotlin)
-- [ ] GPU acceleration for NER
-- [ ] Multi-language support expansion
+- [ ] Enhanced documentation
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! See [CONTRIBUTING.md](/censgate/redact/blob/main/CONTRIBUTING.md) for guidelines.
 
 ```bash
 # Fork and clone
-git clone https://github.com/YOUR_USERNAME/redact.git
+git clone https://github.com/censgate/redact.git
 cd redact
 
 # Create a feature branch
@@ -546,17 +529,9 @@ git push origin feature/my-new-feature
 
 ## License
 
-Censgate Redact is licensed under the [Business Source License 1.1 (BUSL-1.1)](LICENSE).
-
-**Additional Use Grant:** You may use Censgate Redact in production to process up to 100,000 redacted records per month per legal entity, free of charge. Beyond this threshold, a commercial license is required. Contact support@censgate.com for commercial licensing.
-
-**Change Date:** On 1 March 2030 (or four years after each version's release, whichever comes first), each version of Censgate Redact automatically converts to the GNU General Public License v3.0 or later.
+Censgate Redact is licensed under the [Apache License 2.0](LICENSE).
 
 See the [LICENSE](LICENSE) file for the complete license terms.
-
-### Mixed Licensing
-
-Unless explicitly stated otherwise in a subdirectory's own LICENSE file, all code in this repository is licensed under BUSL-1.1. Specific subdirectories (e.g., `sdk/` or `examples/`) may contain their own LICENSE files with different open source licenses (such as MIT or Apache-2.0) to facilitate integration.
 
 Copyright (c) 2026 Censgate LLC
 
@@ -575,8 +550,4 @@ Copyright (c) 2026 Censgate LLC
 
 ---
 
-<div align="center">
-
 **[Star us on GitHub](https://github.com/censgate/redact)** if you find this project useful!
-
-</div>
