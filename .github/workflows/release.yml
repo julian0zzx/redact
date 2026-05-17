@@ -281,7 +281,7 @@ jobs:
           docker run -d --name smoke-test -p 8080:8080 redact-full:smoke-test
           echo "Waiting for server to start..."
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+            if curl -sf http://localhost:8080/healthz > /dev/null 2>&1; then
               echo "Server ready after ${i}s"
               break
             fi
@@ -294,7 +294,7 @@ jobs:
           done
 
           echo "--- Health check ---"
-          HEALTH=$(curl -sf http://localhost:8080/health)
+          HEALTH=$(curl -sf http://localhost:8080/healthz)
           echo "$HEALTH" | python3 -m json.tool
           RECOGNIZERS=$(echo "$HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('recognizers',0))")
           if [ "$RECOGNIZERS" -lt 2 ]; then

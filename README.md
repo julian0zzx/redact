@@ -135,6 +135,18 @@ docker run -p 8080:8080 ghcr.io/censgate/redact:full
 
 The full image uses a pre-built [NER base layer](https://github.com/censgate/redact/pkgs/container/redact-ner-base) (`NER_BASE`, default `ghcr.io/censgate/redact-ner-base:v2`). Override with `--build-arg NER_BASE=...` only if you publish a different tag.
 
+**Platform URL (`PLATFORM_REDACT_API_URL`)** — set this to the HTTP **origin only** (scheme + host + port, **no path**). Clients append `/api/v1/analyze` and `/api/v1/anonymize`. Container listens on **`8080`** by default (`PORT`). Example local compose mapping host `8081` → container `8080`: `http://localhost:8081`.
+
+**Health** — use **`GET /healthz`** or **`GET /health`** (both **HTTP 200**, JSON body includes `"status":"healthy"`).
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `HOST` | `0.0.0.0` | Bind address |
+| `PORT` | `8080` | Listen port inside the container |
+| `NER_MODEL_PATH` | *(unset)* / `/app/model/model.onnx` in full image | ONNX model path; full image enables NER when set |
+| `ORT_DYLIB_PATH` | *(unset)* / `/app/lib/libonnxruntime.so` in full image | ONNX Runtime `.so` for dynamic loading (`ort`) |
+| `ENABLE_TRACING` | `true` | Tower HTTP trace middleware |
+
 The full image bakes in a pre-exported NER model (`dslim/bert-base-NER`) and sets `NER_MODEL_PATH=/app/model/model.onnx`, so NER is enabled at startup. To enable NER with the default image, mount a directory containing `model.onnx` and `tokenizer.json` and set:
 
 ```bash
@@ -245,6 +257,7 @@ fn main() -> anyhow::Result<()> {
 ```bash
 cargo run --release --bin redact-api
 # Server listening on http://0.0.0.0:8080
+# GET /healthz or /health — readiness probe (HTTP 200, JSON)
 ```
 
 ### Analyze Endpoint

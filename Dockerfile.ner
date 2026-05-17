@@ -5,6 +5,8 @@
 # Run:
 #   docker run -p 8080:8080 ghcr.io/censgate/redact:full
 #
+# Health (HTTP 200): GET /healthz or GET /health — base URL only for PLATFORM_REDACT_API_URL (see README).
+#
 # The image bakes in the NER model (~420MB) at /app/model/:
 #   - model.onnx       (ONNX model file)
 #   - tokenizer.json   (HuggingFace tokenizer)

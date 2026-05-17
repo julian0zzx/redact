@@ -89,6 +89,7 @@ impl ApiServer {
         info!("Redact API server listening on {}", addr);
         info!("Endpoints:");
         info!("  GET  /health           - Health check");
+        info!("  GET  /healthz          - Health check (probe alias)");
         info!("  POST /api/v1/analyze   - Analyze text for PII");
         info!("  POST /api/v1/anonymize - Anonymize detected PII");
 

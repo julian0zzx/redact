@@ -12,6 +12,7 @@ use axum::{
 pub fn create_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
+        .route("/healthz", get(health))
         .route("/api/v1/analyze", post(analyze_api))
         .route("/api/v1/anonymize", post(anonymize_api))
         .with_state(state)
@@ -40,6 +41,26 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_healthz_route() {
+        let state = AppState {
+            engine: Arc::new(AnalyzerEngine::new()),
+        };
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/healthz")
                     .body(Body::empty())
                     .unwrap(),
             )
