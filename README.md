@@ -288,6 +288,21 @@ Response:
 }
 ```
 
+By default, `results[].text` includes the detected literal text. Set
+`"include_text": false` on analyze or anonymize requests to omit literal entity
+text while retaining `entity_type`, `start`, `end`, `score`, and
+`recognizer_name`:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Email john@example.com, SSN 123-45-6789",
+    "language": "en",
+    "include_text": false
+  }'
+```
+
 ### Anonymize Endpoint
 
 ```bash
@@ -300,7 +315,8 @@ curl -X POST http://localhost:8080/api/v1/anonymize \
       "mask_char": "*",
       "mask_start_chars": 2,
       "mask_end_chars": 4
-    }
+    },
+    "include_text": false
   }'
 ```
 

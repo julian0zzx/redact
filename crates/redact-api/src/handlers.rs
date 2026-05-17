@@ -13,6 +13,7 @@ use axum::{
     Json,
 };
 use redact_core::{AnalyzerEngine, AnonymizerConfig, EntityType};
+use serde::Deserialize;
 use std::sync::Arc;
 
 /// Application state
@@ -74,6 +75,21 @@ pub async fn analyze(
     State(state): State<AppState>,
     Json(request): Json<AnalyzeRequest>,
 ) -> Result<Json<AnalyzeResponse>, ApiError> {
+    analyze_request(state, request, true).await
+}
+
+pub(crate) async fn analyze_api(
+    State(state): State<AppState>,
+    Json(request): Json<AnalyzeApiRequest>,
+) -> Result<Json<AnalyzeResponse>, ApiError> {
+    analyze_request(state, request.request, request.include_text).await
+}
+
+async fn analyze_request(
+    state: AppState,
+    request: AnalyzeRequest,
+    include_text: bool,
+) -> Result<Json<AnalyzeResponse>, ApiError> {
     // Validate input
     if request.text.is_empty() {
         return Err(ApiError::bad_request("Text cannot be empty"));
@@ -111,7 +127,7 @@ pub async fn analyze(
                 true
             }
         })
-        .map(EntityResult::from)
+        .map(|entity| entity_result(entity, include_text))
         .collect();
 
     // Sort by start position
@@ -128,6 +144,21 @@ pub async fn analyze(
 pub async fn anonymize(
     State(state): State<AppState>,
     Json(request): Json<AnonymizeRequest>,
+) -> Result<Json<AnonymizeResponse>, ApiError> {
+    anonymize_request(state, request, true).await
+}
+
+pub(crate) async fn anonymize_api(
+    State(state): State<AppState>,
+    Json(request): Json<AnonymizeApiRequest>,
+) -> Result<Json<AnonymizeResponse>, ApiError> {
+    anonymize_request(state, request.request, request.include_text).await
+}
+
+async fn anonymize_request(
+    state: AppState,
+    request: AnonymizeRequest,
+    include_text: bool,
 ) -> Result<Json<AnonymizeResponse>, ApiError> {
     // Validate input
     if request.text.is_empty() {
@@ -202,7 +233,7 @@ pub async fn anonymize(
     // Convert results
     let results: Vec<EntityResult> = detected_entities
         .into_iter()
-        .map(EntityResult::from)
+        .map(|entity| entity_result(entity, include_text))
         .collect();
 
     let tokens: Option<Vec<TokenInfo>> = anonymized
@@ -215,6 +246,38 @@ pub async fn anonymize(
         tokens,
         metadata: metadata.into(),
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct AnalyzeApiRequest {
+    #[serde(flatten)]
+    request: AnalyzeRequest,
+
+    /// Include detected entity literal text in results
+    #[serde(default = "default_include_text")]
+    include_text: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct AnonymizeApiRequest {
+    #[serde(flatten)]
+    request: AnonymizeRequest,
+
+    /// Include detected entity literal text in results
+    #[serde(default = "default_include_text")]
+    include_text: bool,
+}
+
+fn default_include_text() -> bool {
+    true
+}
+
+fn entity_result(entity: redact_core::RecognizerResult, include_text: bool) -> EntityResult {
+    let mut result = EntityResult::from(entity);
+    if !include_text {
+        result.text = None;
+    }
+    result
 }
 
 #[cfg(test)]
