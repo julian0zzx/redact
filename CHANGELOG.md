@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Bump `openssl` to 0.10.80 to fix CVE-2026-45784 (GHSA-phqj-4mhp-q6mq, out-of-bounds write in AES-KW-PAD cipher path)
 - Bump `rand` to 0.9.3 to fix GHSA-cq8v-f236-94qc (unsoundness UB when custom logger accesses ThreadRng during reseeding)
   - Updated transitive dependencies in `quinn-proto` and `tokenizers` that also depended on `rand 0.9.2`
 
