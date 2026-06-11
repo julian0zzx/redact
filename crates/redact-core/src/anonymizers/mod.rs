@@ -101,18 +101,29 @@ pub fn apply_anonymization(
     entities: &[RecognizerResult],
     replacement_fn: impl Fn(&RecognizerResult, &str) -> String,
 ) -> String {
+    let (anonymized, _) = apply_anonymization_with_mapping(text, entities, replacement_fn);
+    anonymized
+}
+
+/// Helper to apply anonymization to text and return entity mappings
+pub fn apply_anonymization_with_mapping(
+    text: &str,
+    entities: &[RecognizerResult],
+    replacement_fn: impl Fn(&RecognizerResult, &str) -> String,
+) -> (String, Vec<(usize, String)>) {
     if entities.is_empty() {
-        return text.to_string();
+        return (text.to_string(), vec![]);
     }
 
     let mut result = String::with_capacity(text.len());
     let mut last_end = 0;
+    let mut mappings = Vec::with_capacity(entities.len());
 
     // Sort entities by start position
     let mut sorted_entities = entities.to_vec();
     sorted_entities.sort_by_key(|e| e.start);
 
-    for entity in sorted_entities {
+    for (idx, entity) in sorted_entities.iter().enumerate() {
         // Add text before this entity
         if entity.start > last_end {
             result.push_str(&text[last_end..entity.start]);
@@ -126,7 +137,11 @@ pub fn apply_anonymization(
         };
 
         // Add replacement
-        result.push_str(&replacement_fn(&entity, original));
+        let replacement = replacement_fn(entity, original);
+        result.push_str(&replacement);
+
+        // Store mapping (entity index -> replacement text)
+        mappings.push((idx, replacement));
 
         last_end = entity.end;
     }
@@ -136,7 +151,7 @@ pub fn apply_anonymization(
         result.push_str(&text[last_end..]);
     }
 
-    result
+    (result, mappings)
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See the LICENSE file
 // in the project root for license information.
 
-use super::{apply_anonymization, Anonymizer, AnonymizerConfig};
+use super::{Anonymizer, AnonymizerConfig};
 use crate::types::{AnonymizedResult, RecognizerResult};
 use anyhow::Result;
 
@@ -79,17 +79,26 @@ impl Anonymizer for MaskAnonymizer {
         entities: Vec<RecognizerResult>,
         config: &AnonymizerConfig,
     ) -> Result<AnonymizedResult> {
-        let anonymized_text = apply_anonymization(text, &entities, |_entity, original| {
-            if config.preserve_format {
-                Self::mask_with_format(original, config.mask_char)
-            } else {
-                Self::mask_text(original, config)
+        let (anonymized_text, mappings) =
+            super::apply_anonymization_with_mapping(text, &entities, |_entity, original| {
+                if config.preserve_format {
+                    Self::mask_with_format(original, config.mask_char)
+                } else {
+                    Self::mask_text(original, config)
+                }
+            });
+
+        // Update entities with tackled_text
+        let mut entities_with_tackled = entities;
+        for (idx, (_, tackled)) in mappings.iter().enumerate() {
+            if let Some(entity) = entities_with_tackled.get_mut(idx) {
+                entity.tackled_text = Some(tackled.clone());
             }
-        });
+        }
 
         Ok(AnonymizedResult {
             text: anonymized_text,
-            entities,
+            entities: entities_with_tackled,
             tokens: None,
         })
     }

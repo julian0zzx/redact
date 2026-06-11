@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See the LICENSE file
 // in the project root for license information.
 
-use super::{apply_anonymization, Anonymizer, AnonymizerConfig};
+use super::{Anonymizer, AnonymizerConfig};
 use crate::types::{AnonymizedResult, RecognizerResult};
 use anyhow::Result;
 use sha2::{Digest, Sha256};
@@ -72,14 +72,23 @@ impl Anonymizer for HashAnonymizer {
     ) -> Result<AnonymizedResult> {
         let salt = config.hash_salt.as_deref();
 
-        let anonymized_text = apply_anonymization(text, &entities, |entity, original| {
-            let hash = self.hash_value(original, salt);
-            format!("[{}_{}]", entity.entity_type.as_str(), hash)
-        });
+        let (anonymized_text, mappings) =
+            super::apply_anonymization_with_mapping(text, &entities, |entity, original| {
+                let hash = self.hash_value(original, salt);
+                format!("[{}_{}]", entity.entity_type.as_str(), hash)
+            });
+
+        // Update entities with tackled_text
+        let mut entities_with_tackled = entities;
+        for (idx, (_, tackled)) in mappings.iter().enumerate() {
+            if let Some(entity) = entities_with_tackled.get_mut(idx) {
+                entity.tackled_text = Some(tackled.clone());
+            }
+        }
 
         Ok(AnonymizedResult {
             text: anonymized_text,
-            entities,
+            entities: entities_with_tackled,
             tokens: None,
         })
     }

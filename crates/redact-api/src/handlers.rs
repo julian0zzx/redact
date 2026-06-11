@@ -196,7 +196,7 @@ async fn anonymize_request(
     });
 
     // Analyze and anonymize
-    let result = if let Some(entities) = entity_types.as_ref() {
+    let (anonymized, metadata) = if let Some(entities) = entity_types.as_ref() {
         // First analyze with specific entities
         let analysis = state
             .engine
@@ -214,7 +214,7 @@ async fn anonymize_request(
             )
             .map_err(ApiError::from)?;
 
-        (analysis.detected_entities, anonymized, analysis.metadata)
+        (anonymized, analysis.metadata)
     } else {
         let analysis = state
             .engine
@@ -225,13 +225,12 @@ async fn anonymize_request(
             .anonymized
             .ok_or_else(|| ApiError::internal_error("Anonymization failed"))?;
 
-        (analysis.detected_entities, anonymized, analysis.metadata)
+        (anonymized, analysis.metadata)
     };
 
-    let (detected_entities, anonymized, metadata) = result;
-
-    // Convert results
-    let results: Vec<EntityResult> = detected_entities
+    // Convert results - use entities from anonymized result which have tackled_text populated
+    let results: Vec<EntityResult> = anonymized
+        .entities
         .into_iter()
         .map(|entity| entity_result(entity, include_text))
         .collect();

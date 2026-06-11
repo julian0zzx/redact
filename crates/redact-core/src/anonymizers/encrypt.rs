@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See the LICENSE file
 // in the project root for license information.
 
-use super::{apply_anonymization, Anonymizer, AnonymizerConfig};
+use super::{Anonymizer, AnonymizerConfig};
 use crate::types::{AnonymizedResult, RecognizerResult, Token};
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -234,16 +234,25 @@ impl Anonymizer for EncryptAnonymizer {
             })
             .collect();
 
-        let anonymized_text = apply_anonymization(text, &entities, |entity, _original| {
-            entity_map
-                .get(&(entity.start, entity.end))
-                .cloned()
-                .unwrap_or_else(|| format!("<TOKEN_{}>", Uuid::new_v4()))
-        });
+        let (anonymized_text, mappings) =
+            super::apply_anonymization_with_mapping(text, &entities, |entity, _original| {
+                entity_map
+                    .get(&(entity.start, entity.end))
+                    .cloned()
+                    .unwrap_or_else(|| format!("<TOKEN_{}>", Uuid::new_v4()))
+            });
+
+        // Update entities with tackled_text
+        let mut entities_with_tackled = entities;
+        for (idx, (_, tackled)) in mappings.iter().enumerate() {
+            if let Some(entity) = entities_with_tackled.get_mut(idx) {
+                entity.tackled_text = Some(tackled.clone());
+            }
+        }
 
         Ok(AnonymizedResult {
             text: anonymized_text,
-            entities,
+            entities: entities_with_tackled,
             tokens: Some(tokens),
         })
     }

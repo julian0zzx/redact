@@ -29,6 +29,10 @@ pub struct RecognizerResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
 
+    /// The anonymized replacement text (e.g., "[EMAIL_ADDRESS_855f96e983f1f8e8]")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tackled_text: Option<String>,
+
     /// Additional context or metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<serde_json::Value>,
@@ -49,6 +53,7 @@ impl RecognizerResult {
             score,
             recognizer_name: recognizer_name.into(),
             text: None,
+            tackled_text: None,
             context: None,
         }
     }
@@ -79,6 +84,12 @@ impl RecognizerResult {
             let end = self.end.min(source.len());
             self.text = Some(source[self.start..end].to_string());
         }
+        self
+    }
+
+    /// Add tackled (anonymized) text
+    pub fn with_tackled_text(mut self, tackled: impl Into<String>) -> Self {
+        self.tackled_text = Some(tackled.into());
         self
     }
 

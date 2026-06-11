@@ -66,10 +66,10 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo bench --package redact-core
 
 # Run API server
-cargo run --release --bin redact-api
+cargo run --release -p redact-api
 
 # Run CLI
-cargo run --bin redact-cli -- analyze "test@example.com"
+cargo run -p redact-cli -- analyze "test@example.com"
 ```
 
 ## Code Conventions

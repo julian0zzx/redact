@@ -96,11 +96,14 @@ impl PatternRecognizer {
         // Phone numbers (US/international format with separators)
         // Requires at least one separator or parentheses to avoid matching
         // consecutive digits in credit cards, ISBNs, etc.
-        // Matches: (555) 123-4567, 555-123-4567, 555.123.4567, 555 123 4567
+        // Matches: 
+        // - US: (555) 123-4567, 555-123-4567, 555.123.4567, 555 123 4567
+        // - HK: +852 2345 6789, 852-2345-6789
+        // - CN: +86 10 8888 6666, +86 13800138000, 13800138000 (mobile)
         // Does NOT match: 5551234567 (no separators - too prone to false positives)
         let _ = self.add_pattern(
             EntityType::PhoneNumber,
-            r"\(\d{3}\)[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{3}[-.\s]\d{3}[-.\s]?\d{4}\b",
+            r"\(\d{3}\)[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{3}[-.\s]\d{3}[-.\s]?\d{4}\b|\b\+?852[-.\s]?\d{4}[-.\s]?\d{4}\b|\b\+?86[-.\s]?(?:1[3-9]\d{9}|\d{2,3}[-.\s]?\d{4}[-.\s]?\d{4})\b|\b1[3-9]\d{9}\b",
             0.7,
         );
 
@@ -550,6 +553,58 @@ mod tests {
     fn test_phone_detection() {
         let recognizer = PatternRecognizer::new();
         let text = "Call me at (555) 123-4567";
+        let results = recognizer.analyze(text, "en").unwrap();
+
+        assert!(!results.is_empty());
+        let phone_result = results
+            .iter()
+            .find(|r| r.entity_type == EntityType::PhoneNumber);
+        assert!(phone_result.is_some());
+    }
+
+    #[test]
+    fn test_hk_phone_detection() {
+        let recognizer = PatternRecognizer::new();
+        let text = "Call me at +852 2345 6789";
+        let results = recognizer.analyze(text, "en").unwrap();
+
+        assert!(!results.is_empty());
+        let phone_result = results
+            .iter()
+            .find(|r| r.entity_type == EntityType::PhoneNumber);
+        assert!(phone_result.is_some());
+    }
+
+    #[test]
+    fn test_cn_phone_detection() {
+        let recognizer = PatternRecognizer::new();
+        let text = "Call me at +86 10 8888 6666";
+        let results = recognizer.analyze(text, "en").unwrap();
+
+        assert!(!results.is_empty());
+        let phone_result = results
+            .iter()
+            .find(|r| r.entity_type == EntityType::PhoneNumber);
+        assert!(phone_result.is_some());
+    }
+
+    #[test]
+    fn test_cn_mobile_phone_detection() {
+        let recognizer = PatternRecognizer::new();
+        let text = "Call me at +86 13800138000";
+        let results = recognizer.analyze(text, "en").unwrap();
+
+        assert!(!results.is_empty());
+        let phone_result = results
+            .iter()
+            .find(|r| r.entity_type == EntityType::PhoneNumber);
+        assert!(phone_result.is_some());
+    }
+
+    #[test]
+    fn test_cn_mobile_phone_detection2() {
+        let recognizer = PatternRecognizer::new();
+        let text = "Call me at 13800138000";
         let results = recognizer.analyze(text, "en").unwrap();
 
         assert!(!results.is_empty());

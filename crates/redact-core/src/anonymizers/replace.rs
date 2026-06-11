@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See the LICENSE file
 // in the project root for license information.
 
-use super::{apply_anonymization, Anonymizer, AnonymizerConfig};
+use super::{Anonymizer, AnonymizerConfig};
 use crate::types::{AnonymizedResult, RecognizerResult};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -49,18 +49,28 @@ impl Anonymizer for ReplaceAnonymizer {
         entities: Vec<RecognizerResult>,
         _config: &AnonymizerConfig,
     ) -> Result<AnonymizedResult> {
-        let anonymized_text = apply_anonymization(text, &entities, |entity, _original| {
-            // Check for custom replacement
-            if let Some(replacement) = self.custom_replacements.get(entity.entity_type.as_str()) {
-                replacement.clone()
-            } else {
-                entity.entity_type.default_replacement()
+        let (anonymized_text, mappings) =
+            super::apply_anonymization_with_mapping(text, &entities, |entity, _original| {
+                // Check for custom replacement
+                if let Some(replacement) = self.custom_replacements.get(entity.entity_type.as_str())
+                {
+                    replacement.clone()
+                } else {
+                    entity.entity_type.default_replacement()
+                }
+            });
+
+        // Update entities with tackled_text
+        let mut entities_with_tackled = entities;
+        for (idx, (_, tackled)) in mappings.iter().enumerate() {
+            if let Some(entity) = entities_with_tackled.get_mut(idx) {
+                entity.tackled_text = Some(tackled.clone());
             }
-        });
+        }
 
         Ok(AnonymizedResult {
             text: anonymized_text,
-            entities,
+            entities: entities_with_tackled,
             tokens: None,
         })
     }

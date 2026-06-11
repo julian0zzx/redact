@@ -61,6 +61,10 @@ pub struct EntityResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
 
+    /// The anonymized replacement text (e.g., "[EMAIL_ADDRESS_855f96e983f1f8e8]")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tackled_text: Option<String>,
+
     /// Recognizer that detected this entity
     pub recognizer_name: String,
 }
@@ -224,6 +228,7 @@ impl From<redact_core::RecognizerResult> for EntityResult {
             end: result.end,
             score: result.score,
             text: result.text,
+            tackled_text: result.tackled_text,
             recognizer_name: result.recognizer_name,
         }
     }
