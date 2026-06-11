@@ -4,10 +4,14 @@
 
 use super::{validation::validate_entity, Recognizer, RecognizerResult};
 use crate::types::EntityType;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
+use walkdir::WalkDir;
 
 /// Pattern-based recognizer using regex
 #[derive(Debug, Clone)]
@@ -22,6 +26,30 @@ struct CompiledPattern {
     regex: Regex,
     score: f32,
     context_words: Vec<String>,
+}
+
+/// YAML pattern file structure
+#[derive(Debug, Deserialize, Serialize)]
+struct PatternFile {
+    version: String,
+    framework: String,
+    jurisdiction: String,
+    description: String,
+    patterns: Vec<YamlPattern>,
+}
+
+/// Individual pattern definition from YAML
+#[derive(Debug, Deserialize, Serialize)]
+struct YamlPattern {
+    id: String,
+    name: String,
+    category: String,
+    regex: String,
+    confidence: f32,
+    description: String,
+    examples: Vec<String>,
+    replacement: String,
+    enabled: bool,
 }
 
 impl PatternRecognizer {
@@ -82,6 +110,257 @@ impl PatternRecognizer {
         };
         self.patterns.entry(entity_type).or_default().push(compiled);
         Ok(())
+    }
+
+    /// Load patterns from YAML files in a directory
+    /// 
+    /// # Arguments
+    /// * `patterns_dir` - Path to directory containing YAML pattern files
+    /// 
+    /// # Returns
+    /// * `Ok(usize)` - Number of patterns loaded successfully
+    /// * `Err` - If directory cannot be read or YAML parsing fails
+    /// 
+    /// # Example
+    /// ```no_run
+    /// use redact_core::recognizers::pattern::PatternRecognizer;
+    /// 
+    /// let mut recognizer = PatternRecognizer::new();
+    /// let count = recognizer.load_patterns_from_yaml("patterns").unwrap();
+    /// println!("Loaded {} patterns from YAML files", count);
+    /// ```
+    pub fn load_patterns_from_yaml<P: AsRef<Path>>(&mut self, patterns_dir: P) -> Result<usize> {
+        let patterns_dir = patterns_dir.as_ref();
+        
+        if !patterns_dir.exists() {
+            anyhow::bail!("Patterns directory does not exist: {}", patterns_dir.display());
+        }
+
+        let mut total_loaded = 0;
+        let mut yaml_files = Vec::new();
+
+        // Recursively find all YAML files
+        for entry in WalkDir::new(patterns_dir)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    if ext == "yaml" || ext == "yml" {
+                        yaml_files.push(path.to_path_buf());
+                    }
+                }
+            }
+        }
+
+        tracing::info!("Found {} YAML pattern files in {}", yaml_files.len(), patterns_dir.display());
+
+        // Load each YAML file
+        for yaml_path in yaml_files {
+            match self.load_single_yaml_file(&yaml_path) {
+                Ok(count) => {
+                    tracing::info!(
+                        "Loaded {} patterns from {}",
+                        count,
+                        yaml_path.display()
+                    );
+                    total_loaded += count;
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to load patterns from {}: {}",
+                        yaml_path.display(),
+                        e
+                    );
+                }
+            }
+        }
+
+        tracing::info!("Total patterns loaded from YAML: {}", total_loaded);
+        Ok(total_loaded)
+    }
+
+    /// Load patterns from a single YAML file
+    fn load_single_yaml_file<P: AsRef<Path>>(&mut self, yaml_path: P) -> Result<usize> {
+        let yaml_path = yaml_path.as_ref();
+        let content = fs::read_to_string(yaml_path)
+            .with_context(|| format!("Failed to read YAML file: {}", yaml_path.display()))?;
+
+        let pattern_file: PatternFile = serde_yaml::from_str(&content)
+            .with_context(|| format!("Failed to parse YAML file: {}", yaml_path.display()))?;
+
+        let mut loaded_count = 0;
+
+        for yaml_pattern in pattern_file.patterns {
+            // Skip disabled patterns
+            if !yaml_pattern.enabled {
+                tracing::debug!("Skipping disabled pattern: {}", yaml_pattern.id);
+                continue;
+            }
+
+            // Map pattern ID or category to EntityType
+            let entity_type = self.map_yaml_to_entity_type(&yaml_pattern);
+
+            // Try to compile the regex pattern
+            match self.add_pattern(entity_type, &yaml_pattern.regex, yaml_pattern.confidence) {
+                Ok(_) => {
+                    tracing::debug!(
+                        "Loaded pattern '{}' ({})",
+                        yaml_pattern.name,
+                        yaml_pattern.id
+                    );
+                    loaded_count += 1;
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to compile regex for pattern '{}': {}",
+                        yaml_pattern.id,
+                        e
+                    );
+                }
+            }
+        }
+
+        Ok(loaded_count)
+    }
+
+    /// Map YAML pattern to EntityType based on ID and category
+    fn map_yaml_to_entity_type(&self, pattern: &YamlPattern) -> EntityType {
+        // First try to match by ID prefix
+        let id_upper = pattern.id.to_uppercase();
+        
+        // Direct ID mappings
+        if id_upper.contains("EMAIL") {
+            return EntityType::EmailAddress;
+        }
+        if id_upper.contains("PHONE") || id_upper.contains("MOBILE") {
+            return EntityType::PhoneNumber;
+        }
+        if id_upper.contains("CREDIT_CARD") || id_upper.contains("CREDITCARD") {
+            return EntityType::CreditCard;
+        }
+        if id_upper.contains("SSN") || id_upper == "CCPA_SSN" || id_upper == "HIPAA_SSN" {
+            return EntityType::UsSsn;
+        }
+        if id_upper.contains("IP") && (id_upper.contains("ADDRESS") || id_upper.contains("IPV4")) {
+            return EntityType::IpAddress;
+        }
+        if id_upper.contains("MAC") && id_upper.contains("ADDRESS") {
+            return EntityType::MacAddress;
+        }
+        if id_upper.contains("URL") || id_upper.contains("WEBHOOK") {
+            return EntityType::Url;
+        }
+        if id_upper.contains("DOMAIN") {
+            return EntityType::DomainName;
+        }
+        if id_upper.contains("IBAN") {
+            return EntityType::IbanCode;
+        }
+        if id_upper.contains("UUID") || id_upper.contains("GUID") {
+            return EntityType::Guid;
+        }
+        if id_upper.contains("MD5") {
+            return EntityType::Md5Hash;
+        }
+        if id_upper.contains("SHA1") {
+            return EntityType::Sha1Hash;
+        }
+        if id_upper.contains("SHA256") || id_upper.contains("SHA_256") {
+            return EntityType::Sha256Hash;
+        }
+        if id_upper.contains("BITCOIN") || id_upper.contains("BTC") {
+            return EntityType::BtcAddress;
+        }
+        if id_upper.contains("ETHEREUM") || id_upper.contains("ETH") {
+            return EntityType::EthAddress;
+        }
+        if id_upper.contains("CRYPTO") && id_upper.contains("WALLET") {
+            return EntityType::CryptoWallet;
+        }
+        
+        // UK-specific
+        if id_upper.contains("UK_NHS") || id_upper.contains("NHS_NUMBER") {
+            return EntityType::UkNhs;
+        }
+        if id_upper.contains("UK_NI") || id_upper.contains("NINO") || id_upper.contains("NATIONAL_INSURANCE") {
+            return EntityType::UkNino;
+        }
+        if id_upper.contains("UK_POST") || id_upper.contains("POSTCODE") {
+            return EntityType::UkPostcode;
+        }
+        if id_upper.contains("UK_SORT") || id_upper.contains("SORT_CODE") {
+            return EntityType::UkSortCode;
+        }
+        if id_upper.contains("UK_DRIVER") || id_upper.contains("UK_DRIVING") || id_upper.contains("DRIVING_LICENCE") {
+            return EntityType::UkDriverLicense;
+        }
+        if id_upper.contains("UK_PASSPORT") {
+            return EntityType::UkPassportNumber;
+        }
+        if id_upper.contains("UK_MOBILE") {
+            return EntityType::UkMobileNumber;
+        }
+        if id_upper.contains("UK_PHONE") {
+            return EntityType::UkPhoneNumber;
+        }
+        if id_upper.contains("UK_COMPANY") {
+            return EntityType::UkCompanyNumber;
+        }
+        
+        // US-specific
+        if id_upper.contains("US_DRIVER") || id_upper.contains("DRIVER") && id_upper.contains("LICENSE") {
+            return EntityType::UsDriverLicense;
+        }
+        if id_upper.contains("US_PASSPORT") {
+            return EntityType::UsPassport;
+        }
+        if id_upper.contains("US_ZIP") || id_upper.contains("ZIP_CODE") || id_upper == "CCPA_ZIP_CODE" {
+            return EntityType::UsZipCode;
+        }
+        if id_upper.contains("US_BANK") || id_upper.contains("BANK_ACCOUNT") {
+            return EntityType::UsBankNumber;
+        }
+        
+        // Medical
+        if id_upper.contains("MEDICAL") && (id_upper.contains("LICENSE") || id_upper.contains("LICENCE")) {
+            return EntityType::MedicalLicense;
+        }
+        if id_upper.contains("MEDICAL") && id_upper.contains("RECORD") || id_upper.contains("MRN") {
+            return EntityType::MedicalRecordNumber;
+        }
+        
+        // Generic
+        if id_upper.contains("PASSPORT") {
+            return EntityType::PassportNumber;
+        }
+        if id_upper.contains("DATE") || id_upper.contains("TIME") {
+            return EntityType::DateTime;
+        }
+        if id_upper.contains("AGE") {
+            return EntityType::Age;
+        }
+        if id_upper.contains("ISBN") {
+            return EntityType::Isbn;
+        }
+        if id_upper.contains("PO_BOX") || id_upper.contains("POBOX") {
+            return EntityType::PoBox;
+        }
+        
+        // Coordinates
+        if id_upper.contains("COORDINATE") || id_upper.contains("GPS") || id_upper.contains("LOCATION") && id_upper.contains("GLOBAL") {
+            return EntityType::Location;
+        }
+        
+        // Full name patterns (person names)
+        if id_upper.contains("FULL_NAME") || id_upper.contains("PATIENT_NAME") || id_upper == "HIPAA_NAME" {
+            return EntityType::Person;
+        }
+        
+        // If no match, create a custom entity type from the pattern ID
+        EntityType::Custom(pattern.id.clone())
     }
 
     /// Load default patterns for common PII types

@@ -16,8 +16,32 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 fn build_engine() -> AnalyzerEngine {
     let mut registry = RecognizerRegistry::new();
 
-    // Always add pattern-based recognizer (36+ entity types)
-    registry.add_recognizer(Arc::new(PatternRecognizer::new()));
+    // Create pattern recognizer
+    let mut pattern_recognizer = PatternRecognizer::new();
+    
+    // Load patterns from YAML if LOAD_YAML_PATTERNS is set
+    if let Ok(load_yaml) = std::env::var("LOAD_YAML_PATTERNS") {
+        if load_yaml.to_lowercase() == "true" || load_yaml == "1" {
+            let patterns_dir = std::env::var("PATTERNS_DIR")
+                .unwrap_or_else(|_| "patterns".to_string());
+            
+            info!("Loading patterns from YAML directory: {}", patterns_dir);
+            match pattern_recognizer.load_patterns_from_yaml(&patterns_dir) {
+                Ok(count) => {
+                    info!("Successfully loaded {} patterns from YAML files", count);
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to load patterns from YAML directory '{}': {}. Using default patterns.",
+                        patterns_dir, e
+                    );
+                }
+            }
+        }
+    }
+    
+    // Add pattern-based recognizer (36+ entity types + YAML patterns if loaded)
+    registry.add_recognizer(Arc::new(pattern_recognizer));
 
     // Add NER recognizer when ONNX model path is set
     if let Ok(path) = std::env::var("NER_MODEL_PATH") {

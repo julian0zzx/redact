@@ -361,6 +361,34 @@ Pattern-based detection includes validation (Luhn for credit cards, mod-11 for N
 
 *Requires ONNX model. See [ML-Powered NER](#ml-powered-ner-1) section.*
 
+### YAML Pattern Loading (New in 0.8.3)
+
+Extend detection capabilities by loading patterns from YAML configuration files:
+
+```bash
+# CLI with YAML patterns
+redact --load-yaml analyze "text to scan"
+
+# Custom patterns directory
+redact --load-yaml --patterns-dir ./custom-patterns analyze "text"
+```
+
+For API server:
+```bash
+export LOAD_YAML_PATTERNS=true
+export PATTERNS_DIR=patterns  # optional
+cargo run --release -p redact-api
+```
+
+**Included Pattern Libraries** (78 patterns total):
+- `patterns/pii/global_pii.yaml` - 17 global PII patterns
+- `patterns/compliance/us_hipaa.yaml` - 19 HIPAA Safe Harbor patterns  
+- `patterns/compliance/us_ccpa.yaml` - 11 CCPA patterns
+- `patterns/compliance/uk_gdpr.yaml` - 14 UK GDPR patterns
+- `patterns/security/credentials.yaml` - 17 security credential patterns
+
+See [`patterns/README.md`](patterns/README.md) and [`docs/yaml-patterns.md`](docs/yaml-patterns.md) for full documentation.
+
 ## Anonymization Strategies
 
 | Strategy | Description | Example |

@@ -9,11 +9,13 @@ use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use redact_core::{
     anonymizers::{AnonymizationStrategy, AnonymizerConfig},
+    recognizers::{pattern::PatternRecognizer, RecognizerRegistry},
     AnalyzerEngine, EntityType,
 };
 use serde_json;
 use std::io::{self, Read};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(name = "redact")]
@@ -30,6 +32,14 @@ struct Cli {
     /// Language for analysis
     #[arg(short, long, global = true, default_value = "en")]
     language: String,
+
+    /// Load patterns from YAML files in the patterns directory
+    #[arg(long, global = true)]
+    load_yaml: bool,
+
+    /// Path to patterns directory (default: "patterns")
+    #[arg(long, global = true, default_value = "patterns")]
+    patterns_dir: String,
 }
 
 #[derive(Subcommand)]
@@ -109,7 +119,7 @@ fn run() -> Result<()> {
         } => {
             let input = get_input(text, file)?;
             let entity_types = parse_entity_types(&entities)?;
-            analyze(&input, &cli.language, entity_types, cli.format)?;
+            analyze(&input, &cli.language, entity_types, cli.format, cli.load_yaml, &cli.patterns_dir)?;
         }
         Commands::Anonymize {
             text,
@@ -125,6 +135,8 @@ fn run() -> Result<()> {
                 strategy.into(),
                 entity_types,
                 cli.format,
+                cli.load_yaml,
+                &cli.patterns_dir,
             )?;
         }
     }
@@ -210,8 +222,10 @@ fn analyze(
     language: &str,
     entity_types: Option<Vec<EntityType>>,
     format: OutputFormat,
+    load_yaml: bool,
+    patterns_dir: &str,
 ) -> Result<()> {
-    let engine = AnalyzerEngine::new();
+    let engine = build_engine(load_yaml, patterns_dir)?;
 
     let result = if let Some(types) = entity_types {
         engine.analyze_with_entities(text, &types, Some(language))?
@@ -255,8 +269,10 @@ fn anonymize(
     strategy: AnonymizationStrategy,
     entity_types: Option<Vec<EntityType>>,
     format: OutputFormat,
+    load_yaml: bool,
+    patterns_dir: &str,
 ) -> Result<()> {
-    let engine = AnalyzerEngine::new();
+    let engine = build_engine(load_yaml, patterns_dir)?;
 
     // First analyze with entity type filtering if specified
     let analysis = if let Some(ref types) = entity_types {
@@ -289,6 +305,36 @@ fn anonymize(
     }
 
     Ok(())
+}
+
+/// Build analyzer engine with optional YAML pattern loading
+fn build_engine(load_yaml: bool, patterns_dir: &str) -> Result<AnalyzerEngine> {
+    let mut registry = RecognizerRegistry::new();
+
+    let mut pattern_recognizer = PatternRecognizer::new();
+
+    if load_yaml {
+        eprintln!("Loading patterns from YAML directory: {}", patterns_dir);
+        match pattern_recognizer.load_patterns_from_yaml(patterns_dir) {
+            Ok(count) => {
+                eprintln!("Successfully loaded {} patterns from YAML files", count);
+            }
+            Err(e) => {
+                eprintln!(
+                    "Warning: Failed to load patterns from '{}': {}. Using default patterns.",
+                    patterns_dir, e
+                );
+            }
+        }
+    }
+
+    registry.add_recognizer(Arc::new(pattern_recognizer));
+
+    let engine = AnalyzerEngine::builder()
+        .with_recognizer_registry(registry)
+        .build();
+
+    Ok(engine)
 }
 
 #[cfg(test)]
